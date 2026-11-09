@@ -76,12 +76,12 @@ class DownloadWindow(tk.Toplevel):
                                    text="⏳ Preparando…",
                                    bg=BG, fg=TEXT,
                                    font=("Segoe UI", 11, "bold"),
-                                   anchor="w")
+                                   anchor="w", justify="left", wraplength=545)
         self._phase_lbl.pack(fill="x")
         self._detail_lbl = tk.Label(sf, text="",
                                     bg=BG, fg=GRAY,
                                     font=("Segoe UI", 10),
-                                    anchor="w")
+                                    anchor="w", justify="left", wraplength=545)
         self._detail_lbl.pack(fill="x", pady=(2, 0))
 
         # ── barra de progreso ──
@@ -152,7 +152,7 @@ class DownloadWindow(tk.Toplevel):
 
     # ── animación spinner ─────────────────────────────────────────
     def _animate(self):
-        if not self.winfo_exists() or self._cancelled:
+        if not self.winfo_exists() or self._cancelled or getattr(self, "_finished", False):
             return
         try:
             self._spin_lbl.configure(text=_SPINNERS[self._spin_idx % 4])
@@ -209,6 +209,7 @@ class DownloadWindow(tk.Toplevel):
         self._safe(_do)
 
     def done(self, message: str = "✅ Descarga completada", path: str = None):
+        self._finished = True     # para el spinner (antes tapaba el ✅)
         def _do():
             self._pb.stop()
             self._pb.configure(mode="determinate")
@@ -240,14 +241,30 @@ class DownloadWindow(tk.Toplevel):
         except Exception:
             pass
 
-    def error(self, message: str = "❌ Error en la descarga"):
+    def error(self, message: str = "Error en la descarga"):
+        """Primera línea = qué pasó; segunda = qué hacer; el resto (salida
+        técnica de yt-dlp/ffmpeg) va al log, no a la cabecera."""
+        lines = [l for l in str(message).strip().splitlines() if l.strip()] or ["Error en la descarga"]
+        title = lines[0].lstrip("❌ ").strip()
+        rest = lines[1:]
+        hint = rest[0] if rest and len(rest) == 1 and len(rest[0]) < 160 else ""
+        details = rest if not hint else []
+        self._finished = True     # para el spinner (antes tapaba el ❌)
+
         def _do():
             self._pb.stop()
             self._pb.configure(mode="determinate")
             self._pb["value"] = 0
             self._pb_mode = "determinate"
-            self._phase_lbl.configure(text=message, fg=RED)
+            self._phase_lbl.configure(text=f"❌  {title}", fg=RED)
+            self._detail_lbl.configure(text=hint or ("Detalles técnicos en el log ↓" if details else ""), fg=TEXT if hint else GRAY)
+            self._pct_lbl.configure(text="")
             self._spin_lbl.configure(text="❌", fg=RED)
+            if details:
+                self._log.configure(state="normal")
+                self._log.insert("end", "\n── Error ──\n" + "\n".join(details) + "\n")
+                self._log.see("end")
+                self._log.configure(state="disabled")
             self._cancel_btn.configure(
                 text="✕  Cerrar", bg="#7f1d1d",
                 command=self.destroy)

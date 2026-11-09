@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Datos locales de la app
+.cache/
+config.json
+config.json.tmp
+.retazo_tmp_*/
+
+# Copias de seguridad y código antiguo
+backup_*/
+app.py
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Archivo de trabajo del icono (con calco embebido); la versión limpia está en assets/
+/icon.svg

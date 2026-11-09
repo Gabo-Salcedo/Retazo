@@ -33,6 +33,13 @@ class DownloadCancelled(Exception):
     pass
 
 
+class UserFacingError(Exception):
+    """Error con explicación para el usuario (título + qué hacer)."""
+    def __init__(self, title, hint=""):
+        super().__init__(title)
+        self.title, self.hint = title, hint
+
+
 def crop_filter(crop_coords, canvas_w, canvas_h):
     """Rectángulo en coords del canvas → filtro crop de ffmpeg en proporciones
     (independiente de la resolución real descargada). None si no hay recorte."""
@@ -118,23 +125,37 @@ class DownloadJob:
         self._check_cancel()
         return self._proc.returncode
 
-    def _error_tail(self, n=12):
-        # Descarta los pares clave=valor de -progress, que no explican nada.
+    def _error_tail(self, n=8):
+        """Líneas útiles de la salida: primero las que parecen errores; si no
+        hay, las últimas (sin pares clave=valor ni progreso)."""
         lines = [l for l in self._tail
                  if not re.match(r"^[a-z_]+=\S*$", l) and not _YTDLP_PCT.search(l)]
-        return "\n".join(lines[-n:])
+        errs = [l for l in lines if re.search(r"error|invalid|does not contain|unable|not found|denied|forbidden|unavailable|login|sign in", l, re.I)]
+        return "\n".join((errs or lines)[-n:])
 
     @staticmethod
-    def _probe_duration(path):
+    def _probe(path):
+        """(duración_s | None, tiene_video, tiene_audio) leyendo la cabecera con ffmpeg."""
         try:
             probe = subprocess.run([FFMPEG, "-hide_banner", "-i", path], capture_output=True, text=True,
                                    encoding="utf-8", errors="replace", timeout=30, creationflags=NO_WINDOW)
-            m = _DURATION.search(probe.stderr)
-            if m:
-                return float(m.group(1)) * 3600 + float(m.group(2)) * 60 + float(m.group(3))
+            err = probe.stderr
         except Exception:
-            pass
-        return None
+            return None, True, True
+        dur = None
+        m = _DURATION.search(err)
+        if m:
+            dur = float(m.group(1)) * 3600 + float(m.group(2)) * 60 + float(m.group(3))
+        streams = [l for l in err.splitlines() if re.search(r"Stream #\S+", l)]
+        has_video = any(": Video:" in l and "attached pic" not in l for l in streams)   # portada ≠ vídeo
+        has_audio = any(": Audio:" in l for l in streams)
+        if not streams:                          # no se pudo leer: no bloquear
+            return dur, True, True
+        return dur, has_video, has_audio
+
+    @classmethod
+    def _probe_duration(cls, path):
+        return cls._probe(path)[0]
 
     @staticmethod
     def _rmtree_retry(path):
@@ -269,7 +290,7 @@ class DownloadJob:
                     win.log(line)
 
             if self._stream(ytdlp_cmd(*args, url=self.url), on_ytdlp) != 0:
-                raise RuntimeError("yt-dlp no pudo descargar el vídeo.\n" + self._error_tail())
+                raise RuntimeError("No se pudo descargar el vídeo.\n" + self._error_tail())
 
             sources = [p for p in glob.glob(os.path.join(tmpdir, "src.*"))
                        if not p.endswith((".part", ".ytdl", ".temp"))]
@@ -277,12 +298,22 @@ class DownloadJob:
                 raise RuntimeError("yt-dlp terminó sin generar archivo.\n" + self._error_tail())
             src = max(sources, key=os.path.getsize)
 
+            actual, has_video, has_audio = self._probe(src)
+            if kind == "audio" and not has_audio:
+                raise UserFacingError(
+                    "Este vídeo no tiene pista de audio.",
+                    "Cambia «Contenido» a «Video + Audio» o «Solo Video», o elige MP4/GIF en «Formato».")
+            if kind in ("av", "video", "gif") and not has_video:
+                raise UserFacingError(
+                    "Este enlace solo contiene audio.",
+                    "Elige MP3, WAV o «Solo Audio» para exportarlo.")
+            if kind == "av" and not has_audio:
+                win.log("ℹ El vídeo no tiene audio: se exportará solo la imagen.")
+
             # Si yt-dlp ignoró --download-sections y bajó todo, recortamos localmente.
             needs_trim = not is_youtube
-            if is_youtube:
-                actual = self._probe_duration(src)
-                if actual is not None and actual > dur_total + 15:
-                    needs_trim = True
+            if is_youtube and actual is not None and actual > dur_total + 15:
+                needs_trim = True
 
             # FASE 2: ffmpeg → archivo temporal
             self._check_cancel()
@@ -311,7 +342,7 @@ class DownloadJob:
                 win.log(line)
 
             if self._stream(ff_cmd, on_ffmpeg) != 0 or not os.path.exists(tmp_out):
-                raise RuntimeError("ffmpeg falló al procesar el vídeo.\n" + self._error_tail())
+                raise RuntimeError("No se pudo procesar el vídeo.\n" + self._error_tail())
 
             # FASE 3: mover el resultado con nombre único (nunca sobrescribe)
             title = safe_filename(self.video_info.get("title", "video"), 50)
@@ -324,9 +355,11 @@ class DownloadJob:
 
         except DownloadCancelled:
             pass
+        except UserFacingError as e:
+            win.error(f"{e.title}\n{e.hint}".strip())
         except Exception as e:
             if not self.is_cancelled():
-                win.error(f"❌ {e}")
+                win.error(str(e))
         finally:
             self._proc = None
             if tmpdir:

@@ -93,6 +93,14 @@ Patrones tomados del exportador de Cap (CapSoftware/Cap, `crates/export`): salid
 - Nuevo icono (tijeras cortando película). `assets/icon.svg` es el SVG del autor sin la imagen de calco oculta (1,6 MB → 8 KB, idéntico al renderizar). Derivados: `icon.png` (1024), `icon_256.png`, `icon.ico` (16–256) sobre cuadrado violeta, y `glyph_accent.png` para la cabecera y el estado vacío.
 - Icono de ventana/Toplevels (`iconphoto` + `iconbitmap(default=…)`, que además evita que CustomTkinter imponga el suyo) y AppUserModelID `Retazo.App` en `main.py` para que la barra de tareas no muestre el de Python.
 
+- Máscara del recorte: PNG RGBA semitransparente en lugar de `stipple="gray50"` (que se veía como tramado de puntos); guías de tercios con línea discontinua.
+
+### 13. Vídeos sin audio y errores legibles (9 nov 2026)
+- Caso real: un «GIF» de X (MP4 sin audio) con «Solo Audio» hacía fallar ffmpeg con `Output file does not contain any stream`.
+- `DownloadJob._probe()` lee las pistas del archivo descargado: «Solo Audio»/MP3/WAV sin audio → mensaje claro con qué cambiar; vídeo sin audio en MP4 → se exporta solo la imagen; enlace solo-audio en MP4/GIF → aviso.
+- La UI avisa antes de descargar (si yt-dlp indica que ningún formato trae audio) y muestra «🔇 sin audio» junto a la duración.
+- Ventana de descarga: la cabecera muestra solo «qué pasó» + «qué hacer»; la salida técnica de yt-dlp/ffmpeg va al log (antes se volcaba en rojo grande y se cortaba). El spinner se detiene al terminar.
+
 ## Next Steps / Known Quirks
 - `app.py` (monolito antiguo) y `backup_reparacion_*` ya no se usan; se pueden borrar.
 - El proxy de vista previa descarga el vídeo completo en calidad mínima; en vídeos muy largos tarda.

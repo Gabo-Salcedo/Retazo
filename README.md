@@ -12,6 +12,8 @@ Paste a URL, set the in and out points, crop the frame if you want, and export t
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white)
 ![yt-dlp](https://img.shields.io/badge/engine-yt--dlp-red)
 ![FFmpeg](https://img.shields.io/badge/processing-FFmpeg-007808?logo=ffmpeg&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-8b5cf6)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A5-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Gabo-Salcedo)
 
 <img src="docs/screenshot.png" alt="Retazo interface" width="900">
 
@@ -46,8 +48,8 @@ Sample frame from <a href="https://studio.blender.org/films/charge/"><i>Charge</
 ## Installation
 
 ```bat
-git clone https://github.com/<your-username>/retazo.git
-cd retazo
+git clone https://github.com/Gabo-Salcedo/Retazo.git
+cd Retazo
 setup.bat
 ```
 
@@ -148,6 +150,12 @@ Retazo is meant for content you own, content in the public domain, or content yo
 - Design inspired by [Cap](https://github.com/CapSoftware/Cap).
 - Screenshot frame: [*Charge*](https://studio.blender.org/films/charge/) by Blender Studio (Blender Foundation open movie).
 
+## Support the project
+
+Retazo is free and open source. If it saves you time, you can support its development through [GitHub Sponsors](https://github.com/sponsors/Gabo-Salcedo) ♥
+
 ## License
 
-To be decided.
+[MIT](LICENSE) © 2026 Gabo Salcedo.
+
+Third-party components keep their own licenses (yt-dlp, FFmpeg, CustomTkinter, ffpyplayer…). The sample frame in `docs/screenshot.png` is from *Charge* © Blender Foundation and is not covered by this project's license.

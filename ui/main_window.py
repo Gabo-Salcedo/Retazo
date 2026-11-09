@@ -454,6 +454,18 @@ class RetazoUI(ctk.CTk):
             hint = "Se guardará como .mp4 · " + " · ".join(parts)
         self.export_hint.configure(text=hint)
 
+    @staticmethod
+    def _info_has_audio(info):
+        """False solo si yt-dlp indica claramente que ningún formato trae audio
+        (p. ej. los «GIF» de X, que son MP4 sin sonido). Si no se sabe: True."""
+        if not info:
+            return True
+        fmts = info.get("formats") or [info]
+        codecs = [f.get("acodec") for f in fmts]
+        if any(c not in (None, "none") for c in codecs):
+            return True
+        return not (codecs and all(c == "none" for c in codecs))
+
     def _set_play_icon(self, playing):
         self.play_btn.configure(text="⏸" if playing else "▶")
 
@@ -535,7 +547,8 @@ class RetazoUI(ctk.CTk):
 
         self.title_lbl.configure(text=title if len(title) <= 80 else title[:79] + "…")
         site = info.get("extractor_key") or info.get("extractor") or ""
-        self.dur_lbl.configure(text=(f"{site}  ·  " if site else "") + f"⏱ {fmt_time(dur)}")
+        no_audio = not self._info_has_audio(info)
+        self.dur_lbl.configure(text=(f"{site}  ·  " if site else "") + ("🔇 sin audio  ·  " if no_audio else "") + f"⏱ {fmt_time(dur)}")
         self.start_e.delete(0, "end"); self.start_e.insert(0, fmt_time(0))
         self.end_e.delete(0, "end"); self.end_e.insert(0, fmt_time(dur))
         self.load_btn.configure(state="normal")
@@ -971,6 +984,13 @@ class RetazoUI(ctk.CTk):
             end = min(end, dur)
         if end <= start:
             return messagebox.showwarning("⚠", "El fin del recorte debe ser posterior al inicio.")
+        fmt, mode = self.format_var.get(), self.export_var.get()
+        audio_only = fmt in ("MP3", "WAV") or (fmt == "MP4" and mode == "Solo Audio")
+        if audio_only and not self._info_has_audio(self.video_info):
+            return messagebox.showwarning(
+                "Sin audio",
+                "Este vídeo no tiene pista de audio, así que no se puede exportar solo el sonido.\n\n"
+                "Cambia «Contenido» a «Video + Audio» o elige MP4/GIF en «Formato».")
         out_folder = self.folder_var.get().strip()
         if not out_folder:
             return messagebox.showwarning("⚠", "Elige una carpeta de salida.")
