@@ -1,0 +1,6 @@
+customtkinter>=5.2.0
+yt-dlp[default]>=2026.10.21
+Pillow>=10.0.0
+requests>=2.31.0
+ffpyplayer>=4.5.0
+truststore>=0.10.4
